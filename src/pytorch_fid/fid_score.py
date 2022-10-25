@@ -268,6 +268,7 @@ def main(_path1, _path2, _device=None, _batch_size=50, _dims=768, _num_workers=3
                                           _dims,
                                           num_workers)
     print('FID: ', fid_value)
+    return fid_value
 
 
 if __name__ == '__main__':
