@@ -51,21 +51,7 @@ except ImportError:
 
 from pytorch_fid.inception import InceptionV3
 
-parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
-parser.add_argument('--batch-size', type=int, default=50,
-                    help='Batch size to use')
-parser.add_argument('--num-workers', type=int,
-                    help=('Number of processes to use for data loading. '
-                          'Defaults to `min(8, num_cpus)`'))
-parser.add_argument('--device', type=str, default=None,
-                    help='Device to use. Like cuda, cuda:0 or cpu')
-parser.add_argument('--dims', type=int, default=2048,
-                    choices=list(InceptionV3.BLOCK_INDEX_BY_DIM),
-                    help=('Dimensionality of Inception features to use. '
-                          'By default, uses pool3 features'))
-parser.add_argument('path', type=str, nargs=2,
-                    help=('Paths to the generated images or '
-                          'to .npz statistic files'))
+
 
 IMAGE_EXTENSIONS = {'bmp', 'jpg', 'jpeg', 'pgm', 'png', 'ppm',
                     'tif', 'tiff', 'webp'}
@@ -122,7 +108,8 @@ def get_activations(files, model, batch_size=50, dims=2048, device='cpu',
                                              drop_last=False,
                                              num_workers=num_workers)
 
-    pred_arr = np.empty((len(files), dims))
+    #pred_arr = np.empty((len(files), dims))
+    pred_arr = np.empty((len(files), 2023))
 
     start_idx = 0
 
@@ -135,9 +122,11 @@ def get_activations(files, model, batch_size=50, dims=2048, device='cpu',
         # If model output is not scalar, apply global spatial average pooling.
         # This happens if you choose a dimensionality not equal 2048.
         if pred.size(2) != 1 or pred.size(3) != 1:
-            pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
+            #pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
+            pred = pred[:,:7,:,:].view(pred.size(0), -1)
 
-        pred = pred.squeeze(3).squeeze(2).cpu().numpy()
+        #pred = pred.squeeze(3).squeeze(2).cpu().numpy()
+        pred = pred.cpu().numpy()
 
         pred_arr[start_idx:start_idx + pred.shape[0]] = pred
 
@@ -262,27 +251,42 @@ def calculate_fid_given_paths(paths, batch_size, device, dims, num_workers=1):
     return fid_value
 
 
-def main():
-    args = parser.parse_args()
-
-    if args.device is None:
+def main(_path1, _path2, _device=None, _batch_size=50, _dims=768, _num_workers=3):
+    if _device is None:
         device = torch.device('cuda' if (torch.cuda.is_available()) else 'cpu')
     else:
-        device = torch.device(args.device)
+        device = torch.device(_device)
 
-    if args.num_workers is None:
+    if _num_workers is None:
         num_avail_cpus = len(os.sched_getaffinity(0))
         num_workers = min(num_avail_cpus, 8)
     else:
-        num_workers = args.num_workers
+        num_workers = _num_workers
 
-    fid_value = calculate_fid_given_paths(args.path,
-                                          args.batch_size,
+    fid_value = calculate_fid_given_paths([_path1, _path2], _batch_size,
                                           device,
-                                          args.dims,
+                                          _dims,
                                           num_workers)
     print('FID: ', fid_value)
 
 
 if __name__ == '__main__':
-    main()
+    parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--batch-size', type=int, default=50,
+                        help='Batch size to use')
+    parser.add_argument('--num-workers', type=int,
+                        help=('Number of processes to use for data loading. '
+                            'Defaults to `min(8, num_cpus)`'))
+    parser.add_argument('--device', type=str, default=None,
+                        help='Device to use. Like cuda, cuda:0 or cpu')
+    parser.add_argument('--dims', type=int, default=768,
+                        choices=list(InceptionV3.BLOCK_INDEX_BY_DIM),
+                        help=('Dimensionality of Inception features to use. '
+                            'By default, uses pool3 features'))
+    parser.add_argument('--path',   default=["/home/thu/data/sg_fid_eval/in32_4debug", "/home/thu/data/sg_fid_eval/in32_4debug"],
+                        help=('Paths to the generated images or '
+                            'to .npz statistic files'))
+    args = parser.parse_args()
+
+
+    main(_device=args.device, _batch_size=args.batch_size, _dims=args.dims, _num_workers=args.num_workers, _path1=args.path[0], _path2=args.path[1])
